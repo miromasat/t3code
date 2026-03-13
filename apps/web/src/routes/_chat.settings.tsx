@@ -54,6 +54,13 @@ const MODEL_PROVIDER_SETTINGS: Array<{
     placeholder: "your-codex-model-slug",
     example: "gpt-6.7-codex-ultra-preview",
   },
+  {
+    provider: "copilot",
+    title: "GitHub Copilot",
+    description: "Save additional Copilot model slugs for the picker and `/model` command.",
+    placeholder: "your-copilot-model-slug",
+    example: "claude-sonnet-4.6",
+  },
 ] as const;
 
 const TIMESTAMP_FORMAT_LABELS = {
@@ -68,6 +75,9 @@ function getCustomModelsForProvider(
 ) {
   switch (provider) {
     case "codex":
+      return settings.customCodexModels;
+    case "copilot":
+      return settings.customCopilotModels;
     default:
       return settings.customCodexModels;
   }
@@ -79,6 +89,9 @@ function getDefaultCustomModelsForProvider(
 ) {
   switch (provider) {
     case "codex":
+      return defaults.customCodexModels;
+    case "copilot":
+      return defaults.customCopilotModels;
     default:
       return defaults.customCodexModels;
   }
@@ -87,6 +100,9 @@ function getDefaultCustomModelsForProvider(
 function patchCustomModels(provider: ProviderKind, models: string[]) {
   switch (provider) {
     case "codex":
+      return { customCodexModels: models };
+    case "copilot":
+      return { customCopilotModels: models };
     default:
       return { customCodexModels: models };
   }
@@ -102,6 +118,7 @@ function SettingsRouteView() {
     Record<ProviderKind, string>
   >({
     codex: "",
+    copilot: "",
   });
   const [customModelErrorByProvider, setCustomModelErrorByProvider] = useState<
     Partial<Record<ProviderKind, string | null>>
@@ -109,6 +126,8 @@ function SettingsRouteView() {
 
   const codexBinaryPath = settings.codexBinaryPath;
   const codexHomePath = settings.codexHomePath;
+  const copilotBinaryPath = settings.copilotBinaryPath;
+  const copilotHomePath = settings.copilotHomePath;
   const keybindingsConfigPath = serverConfigQuery.data?.keybindingsConfigPath ?? null;
   const availableEditors = serverConfigQuery.data?.availableEditors;
 
@@ -364,6 +383,68 @@ function SettingsRouteView() {
                     }
                   >
                     Reset codex overrides
+                  </Button>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="mb-4">
+                <h2 className="text-sm font-medium text-foreground">GitHub Copilot CLI</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  These overrides apply to new Copilot sessions and let you use a non-default
+                  Copilot install.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <label htmlFor="copilot-binary-path" className="block space-y-1">
+                  <span className="text-xs font-medium text-foreground">Copilot binary path</span>
+                  <Input
+                    id="copilot-binary-path"
+                    value={copilotBinaryPath}
+                    onChange={(event) => updateSettings({ copilotBinaryPath: event.target.value })}
+                    placeholder="copilot"
+                    spellCheck={false}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Leave blank to use <code>copilot</code> from your PATH.
+                  </span>
+                </label>
+
+                <label htmlFor="copilot-home-path" className="block space-y-1">
+                  <span className="text-xs font-medium text-foreground">COPILOT_HOME path</span>
+                  <Input
+                    id="copilot-home-path"
+                    value={copilotHomePath}
+                    onChange={(event) => updateSettings({ copilotHomePath: event.target.value })}
+                    placeholder="/Users/you/.copilot"
+                    spellCheck={false}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    Optional custom Copilot home/config directory.
+                  </span>
+                </label>
+
+                <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p>Binary source</p>
+                    <p className="mt-1 break-all font-mono text-[11px] text-foreground">
+                      {copilotBinaryPath || "PATH"}
+                    </p>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="self-start"
+                    onClick={() =>
+                      updateSettings({
+                        copilotBinaryPath: defaults.copilotBinaryPath,
+                        copilotHomePath: defaults.copilotHomePath,
+                      })
+                    }
+                  >
+                    Reset Copilot overrides
                   </Button>
                 </div>
               </div>

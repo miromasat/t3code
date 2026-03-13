@@ -26,6 +26,7 @@ import { ProviderHealth, type ProviderHealthShape } from "../Services/ProviderHe
 
 const DEFAULT_TIMEOUT_MS = 4_000;
 const CODEX_PROVIDER = "codex" as const;
+const COPILOT_PROVIDER = "copilot" as const;
 
 // ── Pure helpers ────────────────────────────────────────────────────
 
@@ -47,6 +48,17 @@ function isCommandMissingCause(error: unknown): boolean {
   return (
     lower.includes("command not found: codex") ||
     lower.includes("spawn codex enoent") ||
+    lower.includes("enoent") ||
+    lower.includes("notfound")
+  );
+}
+
+function isSpecificCommandMissingCause(error: unknown, command: string): boolean {
+  if (!(error instanceof Error)) return false;
+  const lower = error.message.toLowerCase();
+  return (
+    lower.includes(`command not found: ${command}`) ||
+    lower.includes(`spawn ${command} enoent`) ||
     lower.includes("enoent") ||
     lower.includes("notfound")
   );
@@ -244,9 +256,15 @@ const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.
   );
 
 const runCodexCommand = (args: ReadonlyArray<string>) =>
+  runCommand("codex", args);
+
+const runCopilotCommand = (args: ReadonlyArray<string>) =>
+  runCommand("copilot", args);
+
+const runCommand = (commandName: string, args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const command = ChildProcess.make("codex", [...args], {
+    const command = ChildProcess.make(commandName, [...args], {
       shell: process.platform === "win32",
     });
 
@@ -390,18 +408,83 @@ export const checkCodexProviderStatus: Effect.Effect<
   } satisfies ServerProviderStatus;
 });
 
+export const checkCopilotProviderStatus: Effect.Effect<
+  ServerProviderStatus,
+  never,
+  ChildProcessSpawner.ChildProcessSpawner
+> = Effect.gen(function* () {
+  const checkedAt = new Date().toISOString();
+  const versionProbe = yield* runCopilotCommand(["version"]).pipe(
+    Effect.timeoutOption(DEFAULT_TIMEOUT_MS),
+    Effect.result,
+  );
+
+  if (Result.isFailure(versionProbe)) {
+    const error = versionProbe.failure;
+    return {
+      provider: COPILOT_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: isSpecificCommandMissingCause(error, "copilot")
+        ? "GitHub Copilot CLI (`copilot`) is not installed or not on PATH."
+        : `Failed to execute GitHub Copilot CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
+    };
+  }
+
+  if (Option.isNone(versionProbe.success)) {
+    return {
+      provider: COPILOT_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: "GitHub Copilot CLI is installed but failed to run. Timed out while running command.",
+    };
+  }
+
+  const version = versionProbe.success.value;
+  if (version.code !== 0) {
+    const detail = detailFromResult(version);
+    return {
+      provider: COPILOT_PROVIDER,
+      status: "error" as const,
+      available: false,
+      authStatus: "unknown" as const,
+      checkedAt,
+      message: detail
+        ? `GitHub Copilot CLI is installed but failed to run. ${detail}`
+        : "GitHub Copilot CLI is installed but failed to run.",
+    };
+  }
+
+  return {
+    provider: COPILOT_PROVIDER,
+    status: "ready" as const,
+    available: true,
+    authStatus: "unknown" as const,
+    checkedAt,
+    message: "GitHub Copilot CLI is available. Authentication is verified when a session starts.",
+  };
+});
+
 // ── Layer ───────────────────────────────────────────────────────────
 
 export const ProviderHealthLive = Layer.effect(
   ProviderHealth,
   Effect.gen(function* () {
     const codexStatusFiber = yield* checkCodexProviderStatus.pipe(
-      Effect.map(Array.of),
+      Effect.forkScoped,
+    );
+    const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(
       Effect.forkScoped,
     );
 
     return {
-      getStatuses: Fiber.join(codexStatusFiber),
+      getStatuses: Effect.all([Fiber.join(codexStatusFiber), Fiber.join(copilotStatusFiber)]).pipe(
+        Effect.map(([codex, copilot]) => [codex, copilot] as const),
+      ),
     } satisfies ProviderHealthShape;
   }),
 );

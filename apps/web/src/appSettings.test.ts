@@ -45,6 +45,17 @@ describe("getAppModelOptions", () => {
       isCustom: true,
     });
   });
+
+  it("supports Copilot built-in and custom models", () => {
+    const options = getAppModelOptions("copilot", ["custom/copilot-model"]);
+
+    expect(options.map((option) => option.slug)).toEqual([
+      "gpt-5.2",
+      "claude-sonnet-4.6",
+      "claude-haiku-4.5",
+      "custom/copilot-model",
+    ]);
+  });
 });
 
 describe("resolveAppModelSelection", () => {
@@ -56,6 +67,10 @@ describe("resolveAppModelSelection", () => {
 
   it("falls back to the provider default when no model is selected", () => {
     expect(resolveAppModelSelection("codex", [], "")).toBe("gpt-5.4");
+  });
+
+  it("uses the Copilot default when no Copilot model is selected", () => {
+    expect(resolveAppModelSelection("copilot", [], "")).toBe("gpt-5.2");
   });
 });
 

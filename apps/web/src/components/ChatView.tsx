@@ -488,7 +488,8 @@ export default function ChatView({ threadId }: ChatViewProps) {
     selectedProvider,
     activeThread?.model ?? activeProject?.model ?? getDefaultModel(selectedProvider),
   );
-  const customModelsForSelectedProvider = settings.customCodexModels;
+  const customModelsForSelectedProvider =
+    selectedProvider === "copilot" ? settings.customCopilotModels : settings.customCodexModels;
   const selectedModel = useMemo(() => {
     const draftModel = composerDraft.model;
     if (!draftModel) {
@@ -516,16 +517,33 @@ export default function ChatView({ threadId }: ChatViewProps) {
     return Object.keys(codexOptions).length > 0 ? { codex: codexOptions } : undefined;
   }, [selectedCodexFastModeEnabled, selectedEffort, selectedProvider, supportsReasoningEffort]);
   const providerOptionsForDispatch = useMemo(() => {
-    if (!settings.codexBinaryPath && !settings.codexHomePath) {
+    const providerOptions =
+      selectedProvider === "copilot"
+        ? {
+            ...(settings.copilotBinaryPath ? { binaryPath: settings.copilotBinaryPath } : {}),
+            ...(settings.copilotHomePath ? { homePath: settings.copilotHomePath } : {}),
+          }
+        : {
+            ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
+            ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
+          };
+    if (Object.keys(providerOptions).length === 0) {
       return undefined;
     }
-    return {
-      codex: {
-        ...(settings.codexBinaryPath ? { binaryPath: settings.codexBinaryPath } : {}),
-        ...(settings.codexHomePath ? { homePath: settings.codexHomePath } : {}),
-      },
-    };
-  }, [settings.codexBinaryPath, settings.codexHomePath]);
+    return selectedProvider === "copilot"
+      ? {
+          copilot: providerOptions,
+        }
+      : {
+          codex: providerOptions,
+        };
+  }, [
+    selectedProvider,
+    settings.codexBinaryPath,
+    settings.codexHomePath,
+    settings.copilotBinaryPath,
+    settings.copilotHomePath,
+  ]);
   const selectedModelForPicker = selectedModel;
   const modelOptionsByProvider = useMemo(
     () => getCustomModelOptionsByProvider(settings),
@@ -2869,7 +2887,11 @@ export default function ChatView({ threadId }: ChatViewProps) {
       setComposerDraftProvider(activeThread.id, provider);
       setComposerDraftModel(
         activeThread.id,
-        resolveAppModelSelection(provider, settings.customCodexModels, model),
+        resolveAppModelSelection(
+          provider,
+          provider === "copilot" ? settings.customCopilotModels : settings.customCodexModels,
+          model,
+        ),
       );
       scheduleComposerFocus();
     },
@@ -2880,6 +2902,7 @@ export default function ChatView({ threadId }: ChatViewProps) {
       setComposerDraftModel,
       setComposerDraftProvider,
       settings.customCodexModels,
+      settings.customCopilotModels,
     ],
   );
   const onEffortSelect = useCallback(

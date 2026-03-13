@@ -5,6 +5,7 @@ import * as PlatformError from "effect/PlatformError";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import {
+  checkCopilotProviderStatus,
   checkCodexProviderStatus,
   hasCustomModelProvider,
   parseAuthStatusFromOutput,
@@ -232,6 +233,40 @@ it.layer(NodeServices.layer)("ProviderHealth", (it) => {
           }),
         ),
       ),
+    );
+  });
+
+  describe("checkCopilotProviderStatus", () => {
+    it.effect("returns ready when copilot is installed", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCopilotProviderStatus;
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "ready");
+        assert.strictEqual(status.available, true);
+        assert.strictEqual(status.authStatus, "unknown");
+      }).pipe(
+        Effect.provide(
+          mockSpawnerLayer((args) => {
+            const joined = args.join(" ");
+            if (joined === "version") return { stdout: "copilot 1.0.0\n", stderr: "", code: 0 };
+            throw new Error(`Unexpected args: ${joined}`);
+          }),
+        ),
+      ),
+    );
+
+    it.effect("returns unavailable when copilot is missing", () =>
+      Effect.gen(function* () {
+        const status = yield* checkCopilotProviderStatus;
+        assert.strictEqual(status.provider, "copilot");
+        assert.strictEqual(status.status, "error");
+        assert.strictEqual(status.available, false);
+        assert.strictEqual(status.authStatus, "unknown");
+        assert.strictEqual(
+          status.message,
+          "GitHub Copilot CLI (`copilot`) is not installed or not on PATH.",
+        );
+      }).pipe(Effect.provide(failingSpawnerLayer("spawn copilot ENOENT"))),
     );
   });
 

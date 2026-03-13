@@ -54,6 +54,12 @@ describe("resolveModelSlug", () => {
     expect(getDefaultModel()).toBe(DEFAULT_MODEL_BY_PROVIDER.codex);
     expect(getModelOptions()).toEqual(MODEL_OPTIONS_BY_PROVIDER.codex);
   });
+
+  it("supports provider-scoped Copilot models", () => {
+    expect(resolveModelSlug("claude-sonnet-4.6", "copilot")).toBe("claude-sonnet-4.6");
+    expect(getDefaultModel("copilot")).toBe(DEFAULT_MODEL_BY_PROVIDER.copilot);
+    expect(getModelOptions("copilot")).toEqual(MODEL_OPTIONS_BY_PROVIDER.copilot);
+  });
 });
 
 describe("getReasoningEffortOptions", () => {

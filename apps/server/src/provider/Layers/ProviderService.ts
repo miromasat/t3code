@@ -122,6 +122,31 @@ function readPersistedCwd(
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readResumeCursorFromRuntimeEvent(event: ProviderRuntimeEvent): unknown {
+  if (!("payload" in event) || !event.payload || typeof event.payload !== "object") {
+    return undefined;
+  }
+  const payload = event.payload as Record<string, unknown>;
+  if ("resume" in payload && payload.resume !== undefined) {
+    return payload.resume;
+  }
+  if ("resumeCursor" in payload && payload.resumeCursor !== undefined) {
+    return payload.resumeCursor;
+  }
+  if (
+    "detail" in payload &&
+    payload.detail &&
+    typeof payload.detail === "object" &&
+    !Array.isArray(payload.detail)
+  ) {
+    const detail = payload.detail as Record<string, unknown>;
+    if ("resumeCursor" in detail && detail.resumeCursor !== undefined) {
+      return detail.resumeCursor;
+    }
+  }
+  return undefined;
+}
+
 const makeProviderService = (options?: ProviderServiceLiveOptions) =>
   Effect.gen(function* () {
     const analytics = yield* Effect.service(AnalyticsService);
@@ -167,7 +192,28 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
     );
 
     const processRuntimeEvent = (event: ProviderRuntimeEvent): Effect.Effect<void> =>
-      publishRuntimeEvent(event);
+      Effect.gen(function* () {
+        const resumeCursor = readResumeCursorFromRuntimeEvent(event);
+        if (resumeCursor !== undefined) {
+          const bindingOption = yield* directory.getBinding(event.threadId);
+          const binding = Option.getOrUndefined(bindingOption);
+          if (binding) {
+            yield* directory.upsert({
+              threadId: event.threadId,
+              provider: binding.provider,
+              runtimeMode: binding.runtimeMode,
+              status: binding.status,
+              resumeCursor,
+              runtimePayload: {
+                ...(binding.runtimePayload ?? {}),
+                lastRuntimeEvent: event.type,
+                lastRuntimeEventAt: event.createdAt,
+              },
+            });
+          }
+        }
+        yield* publishRuntimeEvent(event);
+      });
 
     const worker = Effect.forever(
       Queue.take(runtimeEventQueue).pipe(Effect.flatMap(processRuntimeEvent)),

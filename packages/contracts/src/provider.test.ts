@@ -34,6 +34,25 @@ describe("ProviderSessionStartInput", () => {
     expect(parsed.providerOptions?.codex?.homePath).toBe("/tmp/.codex");
   });
 
+  it("accepts copilot-compatible payloads", () => {
+    const parsed = decodeProviderSessionStartInput({
+      threadId: "thread-2",
+      provider: "copilot",
+      cwd: "/tmp/workspace",
+      model: "claude-sonnet-4.6",
+      runtimeMode: "full-access",
+      providerOptions: {
+        copilot: {
+          binaryPath: "/usr/local/bin/copilot",
+          homePath: "/tmp/.copilot",
+        },
+      },
+    });
+    expect(parsed.provider).toBe("copilot");
+    expect(parsed.providerOptions?.copilot?.binaryPath).toBe("/usr/local/bin/copilot");
+    expect(parsed.providerOptions?.copilot?.homePath).toBe("/tmp/.copilot");
+  });
+
   it("rejects payloads without runtime mode", () => {
     expect(() =>
       decodeProviderSessionStartInput({
