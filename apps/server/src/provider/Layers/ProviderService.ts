@@ -122,29 +122,32 @@ function readPersistedCwd(
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function readResumeCursorFromRuntimeEvent(event: ProviderRuntimeEvent): unknown {
-  if (!("payload" in event) || !event.payload || typeof event.payload !== "object") {
+function readResumeCursorFromRecord(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
   }
-  const payload = event.payload as Record<string, unknown>;
-  if ("resume" in payload && payload.resume !== undefined) {
-    return payload.resume;
+  const record = value as Record<string, unknown>;
+  if ("resume" in record && record.resume !== undefined) {
+    return record.resume;
   }
-  if ("resumeCursor" in payload && payload.resumeCursor !== undefined) {
-    return payload.resumeCursor;
-  }
-  if (
-    "detail" in payload &&
-    payload.detail &&
-    typeof payload.detail === "object" &&
-    !Array.isArray(payload.detail)
-  ) {
-    const detail = payload.detail as Record<string, unknown>;
-    if ("resumeCursor" in detail && detail.resumeCursor !== undefined) {
-      return detail.resumeCursor;
-    }
+  if ("resumeCursor" in record && record.resumeCursor !== undefined) {
+    return record.resumeCursor;
   }
   return undefined;
+}
+
+function readResumeCursorFromRuntimeEvent(event: ProviderRuntimeEvent): unknown {
+  const payloadResume = readResumeCursorFromRecord("payload" in event ? event.payload : undefined);
+  if (payloadResume !== undefined) {
+    return payloadResume;
+  }
+  const payload =
+    "payload" in event && event.payload && typeof event.payload === "object"
+      ? event.payload
+      : undefined;
+  return readResumeCursorFromRecord(
+    payload && !Array.isArray(payload) ? (payload as Record<string, unknown>).detail : undefined,
+  );
 }
 
 const makeProviderService = (options?: ProviderServiceLiveOptions) =>

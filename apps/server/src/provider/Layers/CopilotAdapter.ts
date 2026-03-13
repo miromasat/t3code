@@ -26,7 +26,7 @@ import type {
 } from "../Services/ProviderAdapter.ts";
 
 const PROVIDER = "copilot" as const;
-const DEFAULT_BINARY_PATH = "copilot";
+const COPILOT_BINARY_NAME = "copilot";
 const DEFAULT_COPILOT_MODEL = "gpt-5.2";
 const INTERRUPT_KILL_TIMEOUT_MS = 2_000;
 
@@ -158,6 +158,24 @@ function buildPrompt(input: {
   return sections.join("\n\n");
 }
 
+function buildCopilotCommandArgs(input: {
+  readonly promptText: string;
+  readonly cwd: string;
+  readonly runtimeMode: ProviderSession["runtimeMode"];
+  readonly model: string;
+}): string[] {
+  return [
+    "-p",
+    input.promptText,
+    "-s",
+    "--no-ask-user",
+    `--add-dir=${input.cwd}`,
+    "--stream=on",
+    ...(input.runtimeMode === "full-access" ? ["--allow-all"] : []),
+    ...(input.model ? ["--model", input.model] : []),
+  ];
+}
+
 function toValidationError(operation: string, issue: string, cause?: unknown) {
   return new ProviderAdapterValidationError({
     provider: PROVIDER,
@@ -225,7 +243,6 @@ const makeCopilotAdapter = () =>
               ? { model: resume.model }
               : { model: DEFAULT_COPILOT_MODEL }),
           threadId: input.threadId,
-          ...(resume ? { resumeCursor: resume } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -306,25 +323,22 @@ const makeCopilotAdapter = () =>
         const itemId = randomUUID();
         const model = input.model?.trim() || context.session.model || DEFAULT_COPILOT_MODEL;
         const binaryPath =
-          context.providerOptions?.copilot?.binaryPath?.trim() || DEFAULT_BINARY_PATH;
+          context.providerOptions?.copilot?.binaryPath?.trim() || COPILOT_BINARY_NAME;
         const copilotHomePath = context.providerOptions?.copilot?.homePath?.trim();
         const promptText = buildPrompt({
           history: context.history,
           userPrompt: prompt,
           interactionMode: input.interactionMode,
         });
-        const args = [
-          "-p",
+        const resolvedCwd = context.session.cwd ?? process.cwd();
+        const args = buildCopilotCommandArgs({
           promptText,
-          "-s",
-          "--no-ask-user",
-          `--add-dir=${context.session.cwd ?? process.cwd()}`,
-          "--stream=on",
-          ...(context.session.runtimeMode === "full-access" ? ["--allow-all"] : []),
-          ...(model ? ["--model", model] : []),
-        ];
+          cwd: resolvedCwd,
+          runtimeMode: context.session.runtimeMode,
+          model,
+        });
         const child = spawn(binaryPath, args, {
-          cwd: context.session.cwd ?? process.cwd(),
+          cwd: resolvedCwd,
           env: {
             ...process.env,
             ...(copilotHomePath ? { COPILOT_HOME: copilotHomePath } : {}),
@@ -474,7 +488,7 @@ const makeCopilotAdapter = () =>
               turnId,
               userPrompt: prompt,
               assistantResponse: trimmedStdout,
-              ...(model ? { model } : {}),
+              model,
             };
             context.history.push(turn);
             context.turns = toThreadTurns(context.history);
@@ -624,12 +638,11 @@ const makeCopilotAdapter = () =>
         if (!context.child || !activeTurnId || (turnId && activeTurnId !== turnId)) {
           return;
         }
-        const child = context.child;
         yield* Effect.sync(() => {
-          child.kill("SIGINT");
+          context.child?.kill("SIGINT");
           setTimeout(() => {
-            if (!child.killed) {
-              child.kill("SIGKILL");
+            if (context.child && !context.child.killed) {
+              context.child.kill("SIGKILL");
             }
           }, INTERRUPT_KILL_TIMEOUT_MS);
         });

@@ -42,25 +42,15 @@ function nonEmptyTrimmed(value: string | undefined): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function isCommandMissingCause(error: unknown): boolean {
+function isCommandMissingCause(error: unknown, command: string): boolean {
   if (!(error instanceof Error)) return false;
   const lower = error.message.toLowerCase();
+  const normalizedCommand = command.toLowerCase();
   return (
-    lower.includes("command not found: codex") ||
-    lower.includes("spawn codex enoent") ||
-    lower.includes("enoent") ||
-    lower.includes("notfound")
-  );
-}
-
-function isSpecificCommandMissingCause(error: unknown, command: string): boolean {
-  if (!(error instanceof Error)) return false;
-  const lower = error.message.toLowerCase();
-  return (
-    lower.includes(`command not found: ${command}`) ||
-    lower.includes(`spawn ${command} enoent`) ||
-    lower.includes("enoent") ||
-    lower.includes("notfound")
+    lower.includes(`command not found: ${normalizedCommand}`) ||
+    lower.includes(`spawn ${normalizedCommand} enoent`) ||
+    (lower.includes(`spawn ${normalizedCommand}`) && lower.includes("enoent")) ||
+    (lower.includes(normalizedCommand) && lower.includes("notfound"))
   );
 }
 
@@ -303,7 +293,7 @@ export const checkCodexProviderStatus: Effect.Effect<
       available: false,
       authStatus: "unknown" as const,
       checkedAt,
-      message: isCommandMissingCause(error)
+      message: isCommandMissingCause(error, "codex")
         ? "Codex CLI (`codex`) is not installed or not on PATH."
         : `Failed to execute Codex CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
     };
@@ -425,7 +415,7 @@ export const checkCopilotProviderStatus: Effect.Effect<
       available: false,
       authStatus: "unknown" as const,
       checkedAt,
-      message: isSpecificCommandMissingCause(error, "copilot")
+      message: isCommandMissingCause(error, "copilot")
         ? "GitHub Copilot CLI (`copilot`) is not installed or not on PATH."
         : `Failed to execute GitHub Copilot CLI health check: ${error instanceof Error ? error.message : String(error)}.`,
     };
@@ -477,9 +467,7 @@ export const ProviderHealthLive = Layer.effect(
     const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(Effect.forkScoped);
 
     return {
-      getStatuses: Effect.all([Fiber.join(codexStatusFiber), Fiber.join(copilotStatusFiber)]).pipe(
-        Effect.map(([codex, copilot]) => [codex, copilot] as const),
-      ),
+      getStatuses: Effect.all([Fiber.join(codexStatusFiber), Fiber.join(copilotStatusFiber)]),
     } satisfies ProviderHealthShape;
   }),
 );
