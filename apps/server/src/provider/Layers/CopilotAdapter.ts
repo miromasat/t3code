@@ -82,7 +82,8 @@ function parseResumeCursor(value: unknown): CopilotResumeCursor | undefined {
       const turn = asRecord(entry);
       const turnId = asString(turn?.turnId);
       const userPrompt = asString(turn?.userPrompt);
-      const assistantResponse = typeof turn?.assistantResponse === "string" ? turn.assistantResponse : "";
+      const assistantResponse =
+        typeof turn?.assistantResponse === "string" ? turn.assistantResponse : "";
       const model = asString(turn?.model);
       if (!turnId || !userPrompt) {
         return undefined;
@@ -110,7 +111,9 @@ function serializeResumeCursor(context: CopilotSessionContext): CopilotResumeCur
   };
 }
 
-function toThreadTurns(history: ReadonlyArray<CopilotResumeTurn>): Array<ProviderThreadTurnSnapshot> {
+function toThreadTurns(
+  history: ReadonlyArray<CopilotResumeTurn>,
+): Array<ProviderThreadTurnSnapshot> {
   return history.map((turn) => ({
     id: TurnId.makeUnsafe(turn.turnId),
     items: [
@@ -191,7 +194,9 @@ const makeCopilotAdapter = () =>
     const publish = (event: ProviderRuntimeEvent) =>
       Queue.offer(runtimeEventQueue, event).pipe(Effect.asVoid);
 
-    const getContext = (threadId: ThreadId): Effect.Effect<CopilotSessionContext, ProviderAdapterError> => {
+    const getContext = (
+      threadId: ThreadId,
+    ): Effect.Effect<CopilotSessionContext, ProviderAdapterError> => {
       const context = sessions.get(threadId);
       if (!context) {
         return Effect.fail(
@@ -539,7 +544,9 @@ const makeCopilotAdapter = () =>
           } else {
             const detail =
               trimmedStderr ||
-              (trimmedStdout ? trimmedStdout : `GitHub Copilot CLI exited with code ${code ?? "unknown"}.`);
+              (trimmedStdout
+                ? trimmedStdout
+                : `GitHub Copilot CLI exited with code ${code ?? "unknown"}.`);
             context.session = {
               ...context.session,
               status: interrupted ? "ready" : "error",
@@ -628,7 +635,11 @@ const makeCopilotAdapter = () =>
         });
       });
 
-    const respondToRequest: CopilotAdapterShape["respondToRequest"] = (_threadId, _requestId, _decision) =>
+    const respondToRequest: CopilotAdapterShape["respondToRequest"] = (
+      _threadId,
+      _requestId,
+      _decision,
+    ) =>
       Effect.fail(
         toValidationError(
           "CopilotAdapter.respondToRequest",
@@ -636,7 +647,11 @@ const makeCopilotAdapter = () =>
         ),
       );
 
-    const respondToUserInput: CopilotAdapterShape["respondToUserInput"] = (_threadId, _requestId, _answers) =>
+    const respondToUserInput: CopilotAdapterShape["respondToUserInput"] = (
+      _threadId,
+      _requestId,
+      _answers,
+    ) =>
       Effect.fail(
         toValidationError(
           "CopilotAdapter.respondToUserInput",

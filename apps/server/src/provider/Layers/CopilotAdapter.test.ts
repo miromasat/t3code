@@ -56,7 +56,10 @@ layer("CopilotAdapterLive", (it) => {
       yield* Effect.addFinalizer(() => Effect.sync(cleanup));
       const adapter = yield* CopilotAdapter;
       const threadId = asThreadId("thread-copilot");
-      const eventFiber = yield* Stream.take(adapter.streamEvents, 8).pipe(Stream.runCollect, Effect.fork);
+      const eventFiber = yield* Stream.take(adapter.streamEvents, 8).pipe(
+        Stream.runCollect,
+        Effect.fork,
+      );
 
       const session = yield* adapter.startSession({
         provider: "copilot",

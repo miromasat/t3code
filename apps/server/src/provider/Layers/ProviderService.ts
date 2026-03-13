@@ -205,7 +205,7 @@ const makeProviderService = (options?: ProviderServiceLiveOptions) =>
               status: binding.status,
               resumeCursor,
               runtimePayload: {
-                ...(binding.runtimePayload ?? {}),
+                ...binding.runtimePayload,
                 lastRuntimeEvent: event.type,
                 lastRuntimeEventAt: event.createdAt,
               },

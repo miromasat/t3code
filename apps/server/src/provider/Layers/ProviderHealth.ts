@@ -255,11 +255,9 @@ const collectStreamAsString = <E>(stream: Stream.Stream<Uint8Array, E>): Effect.
     (acc, chunk) => acc + new TextDecoder().decode(chunk),
   );
 
-const runCodexCommand = (args: ReadonlyArray<string>) =>
-  runCommand("codex", args);
+const runCodexCommand = (args: ReadonlyArray<string>) => runCommand("codex", args);
 
-const runCopilotCommand = (args: ReadonlyArray<string>) =>
-  runCommand("copilot", args);
+const runCopilotCommand = (args: ReadonlyArray<string>) => runCommand("copilot", args);
 
 const runCommand = (commandName: string, args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
@@ -440,7 +438,8 @@ export const checkCopilotProviderStatus: Effect.Effect<
       available: false,
       authStatus: "unknown" as const,
       checkedAt,
-      message: "GitHub Copilot CLI is installed but failed to run. Timed out while running command.",
+      message:
+        "GitHub Copilot CLI is installed but failed to run. Timed out while running command.",
     };
   }
 
@@ -474,12 +473,8 @@ export const checkCopilotProviderStatus: Effect.Effect<
 export const ProviderHealthLive = Layer.effect(
   ProviderHealth,
   Effect.gen(function* () {
-    const codexStatusFiber = yield* checkCodexProviderStatus.pipe(
-      Effect.forkScoped,
-    );
-    const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(
-      Effect.forkScoped,
-    );
+    const codexStatusFiber = yield* checkCodexProviderStatus.pipe(Effect.forkScoped);
+    const copilotStatusFiber = yield* checkCopilotProviderStatus.pipe(Effect.forkScoped);
 
     return {
       getStatuses: Effect.all([Fiber.join(codexStatusFiber), Fiber.join(copilotStatusFiber)]).pipe(
